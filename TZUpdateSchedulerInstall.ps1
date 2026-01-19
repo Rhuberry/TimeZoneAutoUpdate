@@ -33,13 +33,12 @@ exit 0
 
 # ---- Task components (modern) ----
 
-# Run as SYSTEM, highest privileges
+# --- Principal / Action / Settings (modern) ---
 $principal = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 
-# Action (explicit bypass helps in managed environments)
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`""
 
-# Settings: remove common blockers, allow battery, retry on failure
+# Keep this permissive to avoid “why didn’t it run?” situations
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
@@ -49,22 +48,29 @@ $settings = New-ScheduledTaskSettingsSet `
     -RestartCount 3 `
     -RestartInterval (New-TimeSpan -Minutes 1)
 
-# Triggers
-$triggerHourly = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Hours 1) -RepetitionDuration ([TimeSpan]::MaxValue)
+# --- Triggers (safe XML) ---
 
-$triggerLogon  = New-ScheduledTaskTrigger -AtLogOn
-# Add a 2-minute delay to logon trigger (property exists even though the cmdlet doesn’t expose it)
-$triggerLogon.Delay = "PT2M"   # ISO-8601 duration (PT2M = 2 minutes)
+# Hourly forever pattern: Daily at 00:00, repeat every 1 hour for 1 day
+# This effectively runs every hour indefinitely.
+$triggerHourly = New-ScheduledTaskTrigger -Daily -At "00:00"
+$triggerHourly.Repetition.Interval = "PT1H"
+$triggerHourly.Repetition.Duration = "P1D"
 
-# Build task definitions
+# Logon trigger with 2-minute delay
+$triggerLogon = New-ScheduledTaskTrigger -AtLogOn
+$triggerLogon.Delay = "PT2M"
+
+# --- Register tasks (modern Windows 10+ compatibility) ---
 $taskDefHourly = New-ScheduledTask -Action $action -Trigger $triggerHourly -Principal $principal -Settings $settings
 $taskDefLogon  = New-ScheduledTask -Action $action -Trigger $triggerLogon  -Principal $principal -Settings $settings
 
-# Register / replace tasks
 Register-ScheduledTask -TaskName $taskHourly -InputObject $taskDefHourly -Force | Out-Null
 Register-ScheduledTask -TaskName $taskLogon  -InputObject $taskDefLogon  -Force | Out-Null
 
-# Detection key (Win32 app)
+# Optional: kick the hourly task once immediately so you don’t wait for the next interval
+try { Start-ScheduledTask -TaskName $taskHourly | Out-Null } catch {}
+
+# --- Detection key (Win32 app) ---
 New-Item -Path $regPath -Force | Out-Null
 New-ItemProperty -Path $regPath -Name "Installed" -PropertyType DWord -Value 1 -Force | Out-Null
 
