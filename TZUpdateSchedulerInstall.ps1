@@ -14,32 +14,30 @@ New-Item -Path $scriptDir -ItemType Directory -Force | Out-Null
 
 # Write the script both tasks will run
 @'
-# Suppresses errors
+# Suppress errors
 $ErrorActionPreference = "SilentlyContinue"
 
-# Points at the tzautoupdate service registry key
 $tzReg = "HKLM:\SYSTEM\CurrentControlSet\Services\tzautoupdate"
 
-# Ensure auto TZ is enabled
+# --- Mimic Settings toggle OFF ---
+try { Set-ItemProperty -Path $tzReg -Name Start -Value 4 -Force } catch {}
+try { Stop-Service tzautoupdate -ErrorAction SilentlyContinue } catch {}
+Start-Sleep -Seconds 2
+
+# --- Mimic Settings toggle ON ---
 try { Set-ItemProperty -Path $tzReg -Name Start -Value 3 -Force } catch {}
 
-# Start required services if not running
-try {
-    $lf = Get-Service lfsvc -ErrorAction SilentlyContinue
-    if ($lf -and $lf.Status -ne "Running") { Start-Service lfsvc -ErrorAction SilentlyContinue }
-} catch {}
+# Restart pipeline
+try { Restart-Service lfsvc -ErrorAction SilentlyContinue } catch {}
+try { Start-Service tzautoupdate -ErrorAction SilentlyContinue } catch {}
 
+# Run Windows TZ sync
 try {
-    $tz = Get-Service tzautoupdate -ErrorAction SilentlyContinue
-    if ($tz -and $tz.Status -ne "Running") { Start-Service tzautoupdate -ErrorAction SilentlyContinue }
+    Start-Process -FilePath "$env:windir\system32\tzsync.exe" -WindowStyle Hidden -Wait
 } catch {}
-
-# Runs Windows’ built-in time zone sync executable
-try { & "$env:windir\system32\tzsync.exe" | Out-Null } catch {}
 
 exit 0
 '@ | Set-Content -Path $scriptPath -Encoding UTF8 -Force
-
 
 # Create/replace Hourly task (SYSTEM)
 schtasks /Create /F `
