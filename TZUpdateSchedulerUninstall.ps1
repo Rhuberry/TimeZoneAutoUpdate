@@ -1,6 +1,6 @@
 $ErrorActionPreference = "SilentlyContinue"
 
-$baseTaskName = "Marco - Trigger TZ Auto Update"
+$baseTaskName = "Time Zone Update"
 $taskHourly   = "$baseTaskName (Hourly)"
 $taskLogon    = "$baseTaskName (Logon)"
 
