@@ -30,6 +30,7 @@ sc.exe start tzautoupdate | Out-Null
 
 exit 0
 '@ | Set-Content -Path $scriptPath -Encoding UTF8 -Force
+
 # Create/replace Hourly task (SYSTEM)
 schtasks /Create /F `
   /TN "$taskHourly" `
