@@ -14,31 +14,22 @@ New-Item -Path $scriptDir -ItemType Directory -Force | Out-Null
 
 # Write the script both tasks will run
 @'
-# Suppress errors
 $ErrorActionPreference = "SilentlyContinue"
 
-$tzReg = "HKLM:\SYSTEM\CurrentControlSet\Services\tzautoupdate"
+# Force startup type to Manual (normal default)
+sc.exe config tzautoupdate start= demand | Out-Null
 
-# --- Mimic Settings toggle OFF ---
-try { Set-ItemProperty -Path $tzReg -Name Start -Value 4 -Force } catch {}
-try { Stop-Service tzautoupdate -ErrorAction SilentlyContinue } catch {}
-Start-Sleep -Seconds 2
+# Make sure Location Framework Service is running
+sc.exe config lfsvc start= auto | Out-Null
+sc.exe start lfsvc | Out-Null
 
-# --- Mimic Settings toggle ON ---
-try { Set-ItemProperty -Path $tzReg -Name Start -Value 3 -Force } catch {}
+Start-Sleep -Seconds 1
 
-# Restart pipeline
-try { Restart-Service lfsvc -ErrorAction SilentlyContinue } catch {}
-try { Start-Service tzautoupdate -ErrorAction SilentlyContinue } catch {}
-
-# Run Windows TZ sync
-try {
-    Start-Process -FilePath "$env:windir\system32\tzsync.exe" -WindowStyle Hidden -Wait
-} catch {}
+# Try starting tzautoupdate again
+sc.exe start tzautoupdate | Out-Null
 
 exit 0
 '@ | Set-Content -Path $scriptPath -Encoding UTF8 -Force
-
 # Create/replace Hourly task (SYSTEM)
 schtasks /Create /F `
   /TN "$taskHourly" `
