@@ -43,6 +43,7 @@ schtasks /Create /F `
 schtasks /Create /F `
   /TN "$taskLogon" `
   /SC ONLOGON `
+  /DELAY 0000:02 `
   /RU "SYSTEM" `
   /RL HIGHEST `
   /TR "powershell.exe -NoProfile -WindowStyle Hidden -File `"$scriptPath`"" | Out-Null
