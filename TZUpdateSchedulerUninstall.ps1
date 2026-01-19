@@ -4,8 +4,8 @@ $baseTaskName = "Marco - Trigger TZ Auto Update"
 $taskHourly   = "$baseTaskName (Hourly)"
 $taskLogon    = "$baseTaskName (Logon)"
 
-$scriptDir = "C:\ProgramData\Marco\TZAutoUpdateSchedule"
-$regPath   = "HKLM:\SOFTWARE\Marco\TZAutoUpdateTrigger"
+$scriptDir = "C:\ProgramData\TimeZoneTaskScheduler"
+$regPath   = "HKLM:\SOFTWARE\TimeZoneTaskScheduler"
 
 # Remove scheduled tasks
 schtasks /Delete /TN "$taskHourly" /F | Out-Null
