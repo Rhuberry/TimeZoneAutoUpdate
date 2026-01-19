@@ -4,9 +4,9 @@ $baseTaskName = "Marco - Trigger TZ Auto Update"
 $taskHourly   = "$baseTaskName (Hourly)"
 $taskLogon    = "$baseTaskName (Logon)"
 
-$regPath  = "HKLM:\SOFTWARE\Marco\TZAutoUpdateTrigger"
+$regPath  = "HKLM:\SOFTWARE\TimeZoneTaskScheduler"
 
-$scriptDir  = "C:\ProgramData\Marco\TZAutoUpdateSchedule"
+$scriptDir  = "C:\ProgramData\TimeZoneTaskScheduler"
 $scriptPath = Join-Path $scriptDir "Run-TZAutoUpdate.ps1"
 
 # Ensure folder exists
