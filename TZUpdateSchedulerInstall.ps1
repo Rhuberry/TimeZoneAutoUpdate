@@ -13,7 +13,7 @@ $scriptPath = Join-Path $scriptDir "Run-TZAutoUpdate.ps1"
 # Ensure folder exists
 New-Item -Path $scriptDir -ItemType Directory -Force | Out-Null
 
-# Helper script (the actual fix)
+# Scipt that actually works to restart time zone
 @'
 $ErrorActionPreference = "SilentlyContinue"
 
