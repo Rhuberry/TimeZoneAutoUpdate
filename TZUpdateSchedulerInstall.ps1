@@ -17,7 +17,7 @@ New-Item -Path $scriptDir -ItemType Directory -Force | Out-Null
 @'
 $ErrorActionPreference = "SilentlyContinue"
 
-$logPath = "C:\ProgramData\TimeZoneTaskScheduler\run.log"
+$logPath = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\TimeZoneTaskScheduler-run.log"
 
 # Ensure log directory exists 
 try {
