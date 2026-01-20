@@ -30,16 +30,18 @@ try {
     Write-Log "Task started | TimeZone (before): `$tzBefore"
 
     sc.exe config tzautoupdate start= demand | Out-Null
-    Write-Log "Set tzautoupdate start=demand"
+    Write-Log "Set tzautoupdate start=demand | exit=`$LASTEXITCODE"
 
     sc.exe config lfsvc start= auto | Out-Null
+    Write-Log "Set lfsvc start=auto | exit=`$LASTEXITCODE"
+
     sc.exe start lfsvc | Out-Null
-    Write-Log "Ensured lfsvc running"
+    Write-Log "Start lfsvc | exit=`$LASTEXITCODE"
 
     Start-Sleep -Seconds 1
 
     sc.exe start tzautoupdate | Out-Null
-    Write-Log "Attempted start tzautoupdate"
+    Write-Log "Start tzautoupdate | exit=`$LASTEXITCODE"
 
     `$tzAfter = (Get-TimeZone).Id
     Write-Log "Task finished | TimeZone (after): `$tzAfter"
@@ -49,6 +51,7 @@ try {
 
 exit 0
 "@ | Set-Content -Path $scriptPath -Encoding UTF8 -Force
+
 
 # -----------------------------
 # Scheduled Task via COM
