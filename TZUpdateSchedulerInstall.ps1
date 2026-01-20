@@ -20,24 +20,35 @@ New-Item -Path $scriptDir -ItemType Directory -Force | Out-Null
 @"
 `$ErrorActionPreference = "SilentlyContinue"
 
-`$logPath = "$logPath"
+`$logPath = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\TimeZoneTaskScheduler-run.log"
 
 try { New-Item -Path (Split-Path `$logPath) -ItemType Directory -Force | Out-Null } catch {}
 
-`$tzBefore = (Get-TimeZone).Id
-"[`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Task started | TimeZone (before): `$tzBefore" | Out-File `$logPath -Append -Encoding utf8
+function Write-Log([string]`$msg) {
+    "[`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] `$msg" | Out-File -FilePath `$logPath -Append -Encoding utf8
+}
 
-sc.exe config tzautoupdate start= demand | Out-Null
+try {
+    `$tzBefore = (Get-TimeZone).Id
+    Write-Log "Task started | TimeZone (before): `$tzBefore"
 
-sc.exe config lfsvc start= auto | Out-Null
-sc.exe start lfsvc | Out-Null
+    sc.exe config tzautoupdate start= demand | Out-Null
+    Write-Log "Set tzautoupdate start=demand"
 
-Start-Sleep -Seconds 1
+    sc.exe config lfsvc start= auto | Out-Null
+    sc.exe start lfsvc | Out-Null
+    Write-Log "Ensured lfsvc running"
 
-sc.exe start tzautoupdate | Out-Null
+    Start-Sleep -Seconds 1
 
-`$tzAfter = (Get-TimeZone).Id
-"[`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Task finished | TimeZone (after):  `$tzAfter" | Out-File `$logPath -Append -Encoding utf8
+    sc.exe start tzautoupdate | Out-Null
+    Write-Log "Attempted start tzautoupdate"
+
+    `$tzAfter = (Get-TimeZone).Id
+    Write-Log "Task finished | TimeZone (after): `$tzAfter"
+} catch {
+    Write-Log "ERROR: `$(`$_.Exception.Message)"
+}
 
 exit 0
 "@ | Set-Content -Path $scriptPath -Encoding UTF8 -Force
