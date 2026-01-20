@@ -17,6 +17,18 @@ New-Item -Path $scriptDir -ItemType Directory -Force | Out-Null
 @'
 $ErrorActionPreference = "SilentlyContinue"
 
+$logPath = "C:\ProgramData\TimeZoneTaskScheduler\run.log"
+
+# Ensure log directory exists 
+try {
+    New-Item -Path (Split-Path $logPath) -ItemType Directory -Force | Out-Null
+} catch {}
+
+# Log start + current time zone
+$tzBefore = (Get-TimeZone).Id
+"[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Task started | TimeZone (before): $tzBefore" | Out-File $logPath -Append -Encoding utf8
+
+# --- fix logic ---
 sc.exe config tzautoupdate start= demand | Out-Null
 
 sc.exe config lfsvc start= auto | Out-Null
@@ -26,8 +38,13 @@ Start-Sleep -Seconds 1
 
 sc.exe start tzautoupdate | Out-Null
 
+# Log finish + resulting time zone
+$tzAfter = (Get-TimeZone).Id
+"[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Task finished | TimeZone (after):  $tzAfter" | Out-File $logPath -Append -Encoding utf8
+
 exit 0
 '@ | Set-Content -Path $scriptPath -Encoding UTF8 -Force
+
 
 # Task action
 $taskRunArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`""
