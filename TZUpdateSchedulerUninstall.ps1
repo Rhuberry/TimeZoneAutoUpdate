@@ -2,6 +2,7 @@ $ErrorActionPreference = "SilentlyContinue"
 
 $baseTaskName = "Time Zone Update"
 $taskHourly   = "$baseTaskName (Hourly)"
+$taskLogon    = "$baseTaskName (Logon)"
 $taskSignIn   = "$baseTaskName (SignIn Event)"
 
 $scriptDir = "C:\ProgramData\TimeZoneTaskScheduler"
@@ -9,6 +10,7 @@ $regPath   = "HKLM:\SOFTWARE\TimeZoneTaskScheduler"
 
 # Remove scheduled tasks
 schtasks /Delete /TN "$taskHourly" /F | Out-Null
+schtasks /Delete /TN "$taskLogon"  /F | Out-Null
 schtasks /Delete /TN "$taskSignIn" /F | Out-Null
 
 # Remove script folder
