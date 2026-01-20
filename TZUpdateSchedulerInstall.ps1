@@ -128,8 +128,19 @@ $null = $root.RegisterTaskDefinition(
     5
 )
 
-# Optional: run once immediately
-try { $root.GetTask($taskName).Run($null) | Out-Null } catch {}
+# Verify it exists (important: don't set detection key if register failed silently)
+try {
+    $null = Get-ScheduledTask -TaskName $taskName -ErrorAction Stop
+} catch {
+    exit 1
+}
+
+# Optional: run once immediately (more reliable than COM Run)
+try {
+    schtasks /Run /TN "$taskName" | Out-Null
+} catch {
+    # optional: don't fail install just because immediate run failed
+}
 
 # -----------------------------
 # Win32 detection key
