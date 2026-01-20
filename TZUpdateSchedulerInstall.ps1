@@ -92,7 +92,7 @@ $task.Settings.Hidden = $false
 $task.Settings.StartWhenAvailable = $true
 $task.Settings.DisallowStartIfOnBatteries = $false
 $task.Settings.StopIfGoingOnBatteries = $false
-$task.Settings.MultipleInstances = 2
+$task.Settings.MultipleInstances = 0
 $task.Settings.ExecutionTimeLimit = "PT2M"
 
 # Action
