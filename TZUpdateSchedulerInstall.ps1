@@ -75,7 +75,9 @@ try {
 
     Set-ScheduledTask -TaskName $taskSignIn -Settings $settings | Out-Null
 
-} catch {} # swallow; your outer install should still succeed
+} catch {
+
+} # swallow; your outer install should still succeed
 
 # Optional: kick once now
 try { & schtasks.exe /Run /TN $taskSignIn | Out-Null } catch {}
