@@ -1,26 +1,30 @@
 $ErrorActionPreference = "SilentlyContinue"
 
-$baseTaskName = "Time Zone Update"
-$taskHourly   = "$baseTaskName (Hourly)"
-$taskLogon    = "$baseTaskName (Logon)"
-$taskSignIn   = "$baseTaskName (SignIn Event)"
+$taskName = "Time Zone Update"
 
 $scriptDir = "C:\ProgramData\TimeZoneTaskScheduler"
 $regPath   = "HKLM:\SOFTWARE\TimeZoneTaskScheduler"
 
-# Remove scheduled tasks
-schtasks /Delete /TN "$taskHourly" /F | Out-Null
-schtasks /Delete /TN "$taskLogon"  /F | Out-Null
-schtasks /Delete /TN "$taskSignIn" /F | Out-Null
+# --- Remove scheduled task (COM) ---
+try {
+    $service = New-Object -ComObject "Schedule.Service"
+    $service.Connect()
+    $root = $service.GetFolder("\")
+    $root.DeleteTask($taskName, 0) | Out-Null
+} catch {}
 
-# Remove script folder
-if (Test-Path $scriptDir) {
-    Remove-Item $scriptDir -Recurse -Force | Out-Null
-}
+# --- Remove script folder ---
+try {
+    if (Test-Path $scriptDir) {
+        Remove-Item $scriptDir -Recurse -Force | Out-Null
+    }
+} catch {}
 
-# Remove detection key
-if (Test-Path $regPath) {
-    Remove-Item $regPath -Recurse -Force | Out-Null
-}
+# --- Remove detection key ---
+try {
+    if (Test-Path $regPath) {
+        Remove-Item $regPath -Recurse -Force | Out-Null
+    }
+} catch {}
 
 exit 0
