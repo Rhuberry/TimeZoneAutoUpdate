@@ -1,19 +1,19 @@
 $ErrorActionPreference = "Stop"
 
-$baseTaskName = "Time Zone Update"
-$taskHourly   = "$baseTaskName (Hourly)"
-$taskLogon    = "$baseTaskName (Logon)"
-$taskSignIn   = "$baseTaskName (SignIn Event)"
-
+# -----------------------------
+# Config
+# -----------------------------
+$taskName = "Time Zone Update"
 $regPath  = "HKLM:\SOFTWARE\TimeZoneTaskScheduler"
 
 $scriptDir  = "C:\ProgramData\TimeZoneTaskScheduler"
 $scriptPath = Join-Path $scriptDir "Run-TZAutoUpdate.ps1"
 
-# Ensure folder exists
+# -----------------------------
+# Helper script (the actual fix) - NO DELAY
+# -----------------------------
 New-Item -Path $scriptDir -ItemType Directory -Force | Out-Null
 
-# Scipt that actually works to restart time zone
 @'
 $ErrorActionPreference = "SilentlyContinue"
 
@@ -29,60 +29,119 @@ sc.exe start tzautoupdate | Out-Null
 exit 0
 '@ | Set-Content -Path $scriptPath -Encoding UTF8 -Force
 
-# Task run command (keep it short)
-$taskRun = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`""
+# Task action
+$taskRunArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`""
 
-# Event filter: 4624 + interactive console (2) or RDP (10)
-$filter4624Interactive = "*[System[EventID=4624]] and *[EventData[Data[@Name='LogonType']='2' or Data[@Name='LogonType']='10']]"
+# 4624 event trigger query (interactive console 2 or RDP 10)
+$eventQuery = @"
+<QueryList>
+  <Query Id="0" Path="Security">
+    <Select Path="Security">
+      *[System[(EventID=4624)]]
+      and
+      *[EventData[Data[@Name='LogonType']='2' or Data[@Name='LogonType']='10']]
+    </Select>
+  </Query>
+</QueryList>
+"@
 
-# ---- Create/replace ONE task (SYSTEM) ----
-# Create the base task as ONEVENT (SignIn) first
-& schtasks.exe /Create /F /TN $taskSignIn /SC ONEVENT /EC Security /MO "$filter4624Interactive" /RU "SYSTEM" /RL HIGHEST /TR $taskRun | Out-Null
+# -----------------------------
+# Create/replace ONE task with multiple triggers using COM
+# -----------------------------
+$service = New-Object -ComObject "Schedule.Service"
+$service.Connect()
 
-# ---- Refetch and add more triggers to SAME task ----
+$root = $service.GetFolder("\")
+
+# Delete existing task if present (idempotent)
+try { $root.DeleteTask($taskName, 0) } catch {}
+
+$task = $service.NewTask(0)
+
+# ---- Registration info (optional) ----
+$task.RegistrationInfo.Description = "Ensures tzautoupdate/lfsvc are started to keep time zone updating correctly."
+
+# ---- Principal (SYSTEM, highest) ----
+# TASK_LOGON_SERVICE_ACCOUNT = 5
+$task.Principal.UserId = "SYSTEM"
+$task.Principal.LogonType = 5
+# TASK_RUNLEVEL_HIGHEST = 1
+$task.Principal.RunLevel = 1
+
+# ---- Settings ----
+$task.Settings.Enabled = $true
+$task.Settings.Hidden  = $false
+$task.Settings.StartWhenAvailable = $true
+
+# Battery behavior
+$task.Settings.DisallowStartIfOnBatteries = $false
+$task.Settings.StopIfGoingOnBatteries     = $false
+
+# Don’t pile up instances
+# TASK_INSTANCES_IGNORE_NEW = 2
+$task.Settings.MultipleInstances = 2
+
+# Execution time limit (PT2M)
+$task.Settings.ExecutionTimeLimit = "PT2M"
+
+# ---- Action: powershell.exe ... ----
+# TASK_ACTION_EXEC = 0
+$action = $task.Actions.Create(0)
+$action.Path = "powershell.exe"
+$action.Arguments = $taskRunArgs
+
+# -----------------------------
+# Triggers
+# -----------------------------
+$triggers = $task.Triggers
+
+# 1) At Startup
+# TASK_TRIGGER_BOOT = 8
+$boot = $triggers.Create(8)
+$boot.Enabled = $true
+
+# 2) At Logon (any user)
+# TASK_TRIGGER_LOGON = 9
+$logon = $triggers.Create(9)
+$logon.Enabled = $true
+
+# 3) Hourly repetition (Time trigger + repetition)
+# TASK_TRIGGER_TIME = 1
+$time = $triggers.Create(1)
+$time.Enabled = $true
+$time.StartBoundary = (Get-Date).AddMinutes(5).ToString("s")
+$time.Repetition.Interval = "PT1H"
+$time.Repetition.Duration = "P3650D"
+$time.Repetition.StopAtDurationEnd = $false
+
+# 4) Event trigger (Security 4624 interactive/RDP)
+# TASK_TRIGGER_EVENT = 0
+$evt = $triggers.Create(0)
+$evt.Enabled = $true
+$evt.Subscription = $eventQuery
+
+# -----------------------------
+# Register the task
+# -----------------------------
+# TASK_CREATE_OR_UPDATE = 6
+# TASK_LOGON_SERVICE_ACCOUNT = 5
+$null = $root.RegisterTaskDefinition(
+    $taskName,
+    $task,
+    6,
+    "SYSTEM",
+    $null,
+    5
+)
+
+# Optional: run once now
 try {
-    $t = Get-ScheduledTask -TaskName $taskSignIn -ErrorAction Stop
+    $root.GetTask($taskName).Run($null) | Out-Null
+} catch {}
 
-    # Keep existing triggers (includes the ONEVENT trigger we just created)
-    $triggers = @($t.Triggers)
-
-    # Add ONLOGON trigger (2 minutes after logon)
-    $trLogon = New-ScheduledTaskTrigger -AtLogOn -Delay (New-TimeSpan -Minutes 2)
-    $triggers += $trLogon
-
-    # Add "hourly" trigger by using a repeating trigger (runs every hour indefinitely-ish)
-    # Note: repetition needs a base trigger; we use a "Once" trigger starting 5 minutes from now.
-    $trHourly = New-ScheduledTaskTrigger `
-        -Once `
-        -At (Get-Date).AddMinutes(5) `
-        -RepetitionInterval (New-TimeSpan -Hours 1) `
-        -RepetitionDuration (New-TimeSpan -Days 3650)
-    $triggers += $trHourly
-
-    # Apply triggers back onto the same task
-    Set-ScheduledTask -TaskName $taskSignIn -Trigger $triggers | Out-Null
-
-    # Apply your settings to the same task
-    $t2 = Get-ScheduledTask -TaskName $taskSignIn -ErrorAction Stop
-    $settings = $t2.Settings
-
-    # Power conditions
-    $settings.DisallowStartIfOnBatteries = $false
-    $settings.StopIfGoingOnBatteries     = $false
-
-    # Start when available when schedule is missed
-    $settings.StartWhenAvailable = $true
-
-    Set-ScheduledTask -TaskName $taskSignIn -Settings $settings | Out-Null
-
-} catch {
-
-} # swallow; your outer install should still succeed
-
-# Optional: kick once now
-try { & schtasks.exe /Run /TN $taskSignIn | Out-Null } catch {}
-
-# Detection key (Win32 app)
+# -----------------------------
+# Win32 detection key
+# -----------------------------
 New-Item -Path $regPath -Force | Out-Null
 New-ItemProperty -Path $regPath -Name "Installed" -PropertyType DWord -Value 1 -Force | Out-Null
 
