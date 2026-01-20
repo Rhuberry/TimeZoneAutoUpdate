@@ -1,24 +1,32 @@
-# Suppresses errors
-$ErrorActionPreference = "SilentlyContinue"
+`$ErrorActionPreference = "SilentlyContinue"
 
-# Points at the tzautoupdate service registry key
-$tzReg = "HKLM:\SYSTEM\CurrentControlSet\Services\tzautoupdate"
+`$logPath = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\TimeZoneTaskScheduler-run.log"
 
-# Ensure auto TZ is enabled
-try { Set-ItemProperty -Path $tzReg -Name Start -Value 3 -Force } catch {}
+try { New-Item -Path (Split-Path `$logPath) -ItemType Directory -Force | Out-Null } catch {}
 
-# Start required services if not running
-try {
-    $lf = Get-Service lfsvc -ErrorAction SilentlyContinue
-    if ($lf -and $lf.Status -ne "Running") { Start-Service lfsvc -ErrorAction SilentlyContinue }
-} catch {}
+function Write-Log([string]`$msg) {
+    "[`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] `$msg" | Out-File -FilePath `$logPath -Append -Encoding utf8
+}
 
 try {
-    $tz = Get-Service tzautoupdate -ErrorAction SilentlyContinue
-    if ($tz -and $tz.Status -ne "Running") { Start-Service tzautoupdate -ErrorAction SilentlyContinue }
-} catch {}
+    `$tzBefore = (Get-TimeZone).Id
+    Write-Log "Task started | TimeZone (before): `$tzBefore"
 
-# Runs Windows’ built-in time zone sync executable
-try { & "$env:windir\system32\tzsync.exe" | Out-Null } catch {}
+    sc.exe config tzautoupdate start= demand | Out-Null
+    Write-Log "Set tzautoupdate start=demand | exit=`$LASTEXITCODE"
 
-exit 0
+    sc.exe config lfsvc start= auto | Out-Null
+    Write-Log "Set lfsvc start=auto | exit=`$LASTEXITCODE"
+
+    sc.exe start lfsvc | Out-Null
+    Write-Log "Start lfsvc | exit=`$LASTEXITCODE"
+
+    Start-Sleep -Seconds 1
+
+    sc.exe start tzautoupdate | Out-Null
+    Write-Log "Start tzautoupdate | exit=`$LASTEXITCODE"
+
+    `$tzAfter = (Get-TimeZone).Id
+    Write-Log "Task finished | TimeZone (after): `$tzAfter"
+} catch {
+    Write-Log "ERROR: `$(`$_.Exception.Message)
