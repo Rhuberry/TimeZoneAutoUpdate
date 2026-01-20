@@ -157,6 +157,6 @@ try {
 # Win32 detection key
 # -----------------------------
 New-Item -Path $regPath -Force | Out-Null
-New-ItemProperty -Path $regPath -Name "Installed" -PropertyType DWord -Value 1 -Force | Out-Null
+New-ItemProperty -Path $regPath -Name "Version" -PropertyType DWord -Value 2 -Force | Out-Null
 
 exit 0
