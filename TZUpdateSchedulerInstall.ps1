@@ -1,47 +1,140 @@
-$ErrorActionPreference = "SilentlyContinue"
+$ErrorActionPreference = "Stop"
 
+# -----------------------------
+# Config
+# -----------------------------
 $taskName = "Time Zone Update"
+$regPath  = "HKLM:\SOFTWARE\TimeZoneTaskScheduler"
 
-$scriptDir = "C:\ProgramData\TimeZoneTaskScheduler"
-$regPath   = "HKLM:\SOFTWARE\TimeZoneTaskScheduler"
+$scriptDir  = "C:\ProgramData\TimeZoneTaskScheduler"
+$scriptPath = Join-Path $scriptDir "Run-TZAutoUpdate.ps1"
 
-# New log location (IME logs folder)
-$imeLogDir  = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs"
-$imeLogFile = Join-Path $imeLogDir "TimeZoneTaskScheduler-run.log"
+# IME log path (shows up in diagnostics bundle)
+$logPath = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\TimeZoneTaskScheduler-run.log"
 
-# --- Remove scheduled task (COM) ---
-try {
-    $service = New-Object -ComObject "Schedule.Service"
-    $service.Connect()
-    $root = $service.GetFolder("\")
-    $root.DeleteTask($taskName, 0) | Out-Null
-} catch {}
+# -----------------------------
+# Helper script (runs via task)
+# -----------------------------
+New-Item -Path $scriptDir -ItemType Directory -Force | Out-Null
 
-# --- Remove script folder ---
-try {
-    if (Test-Path $scriptDir) {
-        Remove-Item $scriptDir -Recurse -Force | Out-Null
-    }
-} catch {}
+@"
+`$ErrorActionPreference = "SilentlyContinue"
 
-# --- Remove custom log file from IME logs folder ---
-try {
-    if (Test-Path $imeLogFile) {
-        Remove-Item $imeLogFile -Force | Out-Null
-    }
-} catch {}
+`$logPath = "$logPath"
 
-# Optional: remove any rotated variants if you ever add them later
-# try {
-#     Get-ChildItem -Path $imeLogDir -Filter "TimeZoneTaskScheduler-run*.log" -ErrorAction SilentlyContinue |
-#         Remove-Item -Force -ErrorAction SilentlyContinue | Out-Null
-# } catch {}
+try { New-Item -Path (Split-Path `$logPath) -ItemType Directory -Force | Out-Null } catch {}
 
-# --- Remove detection key ---
-try {
-    if (Test-Path $regPath) {
-        Remove-Item $regPath -Recurse -Force | Out-Null
-    }
-} catch {}
+`$tzBefore = (Get-TimeZone).Id
+"[`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Task started | TimeZone (before): `$tzBefore" | Out-File `$logPath -Append -Encoding utf8
+
+sc.exe config tzautoupdate start= demand | Out-Null
+
+sc.exe config lfsvc start= auto | Out-Null
+sc.exe start lfsvc | Out-Null
+
+Start-Sleep -Seconds 1
+
+sc.exe start tzautoupdate | Out-Null
+
+`$tzAfter = (Get-TimeZone).Id
+"[`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Task finished | TimeZone (after):  `$tzAfter" | Out-File `$logPath -Append -Encoding utf8
+
+exit 0
+"@ | Set-Content -Path $scriptPath -Encoding UTF8 -Force
+
+# -----------------------------
+# Scheduled Task via COM
+# -----------------------------
+$taskRunArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`""
+
+$eventQuery = @"
+<QueryList>
+  <Query Id="0" Path="Security">
+    <Select Path="Security">
+      *[System[(EventID=4624)]]
+      and
+      *[EventData[Data[@Name='LogonType']='2' or Data[@Name='LogonType']='10']]
+    </Select>
+  </Query>
+</QueryList>
+"@
+
+$service = New-Object -ComObject "Schedule.Service"
+$service.Connect()
+$root = $service.GetFolder("\")
+
+# Idempotent cleanup
+try { $root.DeleteTask($taskName, 0) } catch {}
+
+$task = $service.NewTask(0)
+
+# Metadata
+$task.RegistrationInfo.Description = "Ensures tzautoupdate/lfsvc run to keep time zone accurate."
+
+# Principal (SYSTEM, highest)
+$task.Principal.UserId = "SYSTEM"
+$task.Principal.LogonType = 5
+$task.Principal.RunLevel = 1
+
+# Settings
+$task.Settings.Enabled = $true
+$task.Settings.Hidden = $false
+$task.Settings.StartWhenAvailable = $true
+$task.Settings.DisallowStartIfOnBatteries = $false
+$task.Settings.StopIfGoingOnBatteries = $false
+$task.Settings.MultipleInstances = 2
+$task.Settings.ExecutionTimeLimit = "PT2M"
+
+# Action
+$action = $task.Actions.Create(0)
+$action.Path = "powershell.exe"
+$action.Arguments = $taskRunArgs
+
+# -----------------------------
+# Triggers
+# -----------------------------
+$triggers = $task.Triggers
+
+# At startup
+$boot = $triggers.Create(8)
+$boot.Enabled = $true
+
+# At logon
+$logon = $triggers.Create(9)
+$logon.Enabled = $true
+
+# Hourly repetition
+$time = $triggers.Create(1)
+$time.Enabled = $true
+$time.StartBoundary = (Get-Date).AddMinutes(5).ToString("s")
+$time.Repetition.Interval = "PT1H"
+$time.Repetition.Duration = "P3650D"
+$time.Repetition.StopAtDurationEnd = $false
+
+# Event trigger (4624 interactive/RDP)
+$evt = $triggers.Create(0)
+$evt.Enabled = $true
+$evt.Subscription = $eventQuery
+
+# -----------------------------
+# Register task
+# -----------------------------
+$null = $root.RegisterTaskDefinition(
+    $taskName,
+    $task,
+    6,
+    "SYSTEM",
+    $null,
+    5
+)
+
+# Optional: run once immediately
+try { $root.GetTask($taskName).Run($null) | Out-Null } catch {}
+
+# -----------------------------
+# Win32 detection key
+# -----------------------------
+New-Item -Path $regPath -Force | Out-Null
+New-ItemProperty -Path $regPath -Name "Installed" -PropertyType DWord -Value 1 -Force | Out-Null
 
 exit 0
