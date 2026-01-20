@@ -2,6 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $baseTaskName = "Time Zone Update"
 $taskHourly   = "$baseTaskName (Hourly)"
+$taskLogon    = "$baseTaskName (Logon)"
 $taskSignIn   = "$baseTaskName (SignIn Event)"
 
 $regPath  = "HKLM:\SOFTWARE\TimeZoneTaskScheduler"
@@ -38,6 +39,9 @@ $filter4624Interactive = "*[System[EventID=4624]] and *[EventData[Data[@Name='Lo
 
 # Hourly backstop (every 1 hour)
 & schtasks.exe /Create /F /TN $taskHourly /SC HOURLY /MO 1 /RU "SYSTEM" /RL HIGHEST /TR $taskRun | Out-Null
+
+# Logon trigger (2 minutes after actual sign-in)
+& schtasks.exe /Create /F /TN $taskLogon /SC ONLOGON /DELAY 0000:02 /RU "SYSTEM" /RL HIGHEST /TR $taskRun | Out-Null
 
 # Sign-in event trigger (4624 interactive) - immediate
 & schtasks.exe /Create /F /TN $taskSignIn /SC ONEVENT /EC Security /MO $filter4624Interactive /RU "SYSTEM" /RL HIGHEST /TR $taskRun | Out-Null
