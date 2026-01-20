@@ -64,8 +64,12 @@ foreach ($t in $tasks) {
         $task = Get-ScheduledTask -TaskName $t
         $settings = $task.Settings
 
+        # Power conditions
         $settings.DisallowStartIfOnBatteries = $false
         $settings.StopIfGoingOnBatteries     = $false
+
+        # Start when available when schedule is missed
+        # $settings.StartWhenAvailable = $true
 
         Set-ScheduledTask -TaskName $t -Settings $settings
     } catch {}
