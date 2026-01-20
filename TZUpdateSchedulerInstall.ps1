@@ -9,7 +9,6 @@ $regPath  = "HKLM:\SOFTWARE\TimeZoneTaskScheduler"
 $scriptDir  = "C:\ProgramData\TimeZoneTaskScheduler"
 $scriptPath = Join-Path $scriptDir "Run-TZAutoUpdate.ps1"
 
-# IME log path (shows up in diagnostics bundle)
 $logPath = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\TimeZoneTaskScheduler-run.log"
 
 # -----------------------------
