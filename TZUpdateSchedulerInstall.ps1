@@ -53,4 +53,22 @@ try { & schtasks.exe /Run /TN $taskHourly | Out-Null } catch {}
 New-Item -Path $regPath -Force | Out-Null
 New-ItemProperty -Path $regPath -Name "Installed" -PropertyType DWord -Value 1 -Force | Out-Null
 
+$tasks = @(
+    "Time Zone Update (Hourly)",
+    "Time Zone Update (Logon)",
+    "Time Zone Update (SignIn Event)"
+)
+
+foreach ($t in $tasks) {
+    try {
+        $task = Get-ScheduledTask -TaskName $t
+        $settings = $task.Settings
+
+        $settings.DisallowStartIfOnBatteries = $false
+        $settings.StopIfGoingOnBatteries     = $false
+
+        Set-ScheduledTask -TaskName $t -Settings $settings
+    } catch {}
+}
+
 exit 0
