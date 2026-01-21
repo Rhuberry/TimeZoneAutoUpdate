@@ -5,13 +5,16 @@ $ErrorActionPreference = "Stop"
 # -----------------------------
 $taskName = "Time Zone Update"
 $regPath  = "HKLM:\SOFTWARE\TimeZoneTaskScheduler"
-
-$scriptDir  = "C:\ProgramData\TimeZoneTaskScheduler"
+$scriptDir  = "C:\Program Files\TimeZoneTaskScheduler"  # Non-admins do not have write access to C:\Program Files
+$oldScriptDir = "C:\ProgramData\TimeZoneTaskScheduler"  # Legacy path cleanup
 $scriptPath = Join-Path $scriptDir "Run-TZAutoUpdate.ps1"
 
 # -----------------------------
 # Helper script (runs via task)
 # -----------------------------
+# Remove old script directory (legacy cleanup)
+Remove-Item $oldScriptDir -Recurse -Force -ErrorAction SilentlyContinue
+
 New-Item -Path $scriptDir -ItemType Directory -Force | Out-Null
 
 @"
@@ -157,6 +160,6 @@ try {
 # Win32 detection key
 # -----------------------------
 New-Item -Path $regPath -Force | Out-Null
-New-ItemProperty -Path $regPath -Name "Version" -PropertyType DWord -Value 2 -Force | Out-Null
+New-ItemProperty -Path $regPath -Name "Version" -PropertyType DWord -Value 3 -Force | Out-Null
 
 exit 0
