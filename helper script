@@ -9,7 +9,7 @@ function Write-Log([string]`$msg) {
 }
 
 try {
-    `$tzBefore = (Get-TimeZone).Id
+    $tzBefore = (Get-TimeZone).Id
     Write-Log "Task started | TimeZone (before): `$tzBefore"
 
     sc.exe config tzautoupdate start= demand | Out-Null
@@ -26,7 +26,7 @@ try {
     sc.exe start tzautoupdate | Out-Null
     Write-Log "Start tzautoupdate | exit=`$LASTEXITCODE"
 
-    `$tzAfter = (Get-TimeZone).Id
+    $tzAfter = (Get-TimeZone).Id
     Write-Log "Task finished | TimeZone (after): `$tzAfter"
 } catch {
     Write-Log "ERROR: `$(`$_.Exception.Message)
