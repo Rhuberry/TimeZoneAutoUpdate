@@ -1,6 +1,6 @@
-`$ErrorActionPreference = "SilentlyContinue"
+$ErrorActionPreference = "SilentlyContinue"
 
-`$logPath = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\TimeZoneTaskScheduler-run.log"
+$logPath = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\TimeZoneTaskScheduler-run.log"
 
 try { New-Item -Path (Split-Path `$logPath) -ItemType Directory -Force | Out-Null } catch {}
 
