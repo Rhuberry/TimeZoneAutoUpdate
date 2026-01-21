@@ -1,28 +1,28 @@
 $ErrorActionPreference = "SilentlyContinue"
 
 $taskName  = "Time Zone Update"
-$scriptDir = "C:\ProgramData\TimeZoneTaskScheduler"
+$scriptDir = "C:\Program Files\TimeZoneTaskScheduler"
 $regPath   = "HKLM:\SOFTWARE\TimeZoneTaskScheduler"
 $logFile   = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\TimeZoneTaskScheduler-run.log"
 
 # -----------------------------
 # Remove scheduled task
 # -----------------------------
-try { schtasks /Delete /TN "$taskName" /F | Out-Null } catch {}
+schtasks /Delete /TN "$taskName" /F 2>$null | Out-Null
 
 # -----------------------------
 # Remove script directory
 # -----------------------------
-try { if (Test-Path $scriptDir) { Remove-Item $scriptDir -Recurse -Force | Out-Null } } catch {}
+Remove-Item $scriptDir -Recurse -Force -ErrorAction SilentlyContinue
 
 # -----------------------------
 # Remove log
 # -----------------------------
-try { if (Test-Path $logFile) { Remove-Item $logFile -Force | Out-Null } } catch {}
+Remove-Item $logFile -Force -ErrorAction SilentlyContinue
 
 # -----------------------------
 # Remove detection key
 # -----------------------------
-try { if (Test-Path $regPath) { Remove-Item $regPath -Recurse -Force | Out-Null } } catch {}
+Remove-Item $regPath -Recurse -Force -ErrorAction SilentlyContinue
 
 exit 0
